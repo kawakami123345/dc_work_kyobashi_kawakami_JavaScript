@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <title>課題</title>
+  </head>
+  <body>
+    <div id="textbox">
+      <p id="element_1">要素1</p>
+    </div>
+    <script>
+      const element_1 = document.getElementById("element_1");
+      const textbox = document.getElementById("textbox");
+
+      element_1.textContent = "変更後テキスト";
+      textbox.style.backgroundColor = "#ffff00";
+
+      let new_element1 = document.createElement("p");
+      new_element1.textContent = "追加テキスト";
+      new_element1.style.color = "#ff0000";
+      new_element1.style.fontSize = 30 + "px";
+
+      textbox.appendChild(new_element1);
+    </script>
+  </body>
+</html>
