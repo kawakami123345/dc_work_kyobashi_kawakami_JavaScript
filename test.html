@@ -1,20 +1,21 @@
 <!DOCTYPE html>
 <html lang="ja">
-    <head>
-        <meta charset="UTF-8">
-        <title>TRY01</title>
-        <script>
-            let num =10;
-            function scope_in_function() {
-                let num = 20;
+  <head>
+    <meta charset="UTF-8" />
+    <title>TRY01</title>
+    <script>
+      let num = 10;
+      function scope_in_function() {
+        let num = 20;
 
-                document.write(`<p> num：${num}</p>`);
-            }
-            scope_in_function();
+        document.write(`<p> num：${num}</p>`);
+      }
+      scope_in_function();
 
-            document.write(`<p> num：${num}</p>`);
-        </script>
-    </head>
-    <body>
-    </body>
+      document.write(`<p> num：${num}</p>`);
+    </script>
+  </head>
+  <body>
+    <p>Hello</p>
+  </body>
 </html>
