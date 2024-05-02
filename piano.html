@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <title>PIANO</title>
+
+    <style>
+      .key {
+        border: 1px solid black;
+        float: left;
+        padding: 10px;
+        margin: 10px;
+      }
+    </style>
+    <script src="assets/js/jquery-3.7.1.min.js"></script>
+  </head>
+  <body>
+    <div class="key do">ド</div>
+    <div class="key re">レ</div>
+    <div class="key mi">ミ</div>
+    <div class="key fa">ファ</div>
+    <div class="key so">ソ</div>
+    <div class="key ra">ラ</div>
+    <div class="key si">シ</div>
+    <div class="key show"></div>
+    <script>
+      const audio = new AudioContext();
+      class Keyboard {
+        constructor(node, element) {
+          this.keys = {};
+        }
+        add_key(node, element) {
+          this.keys[node] = element;
+        }
+        key_down(node) {}
+        key_up() {}
+      }
+    </script>
+  </body>
+</html>
