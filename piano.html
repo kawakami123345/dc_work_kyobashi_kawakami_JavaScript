@@ -3,38 +3,134 @@
   <head>
     <meta charset="UTF-8" />
     <title>PIANO</title>
-
-    <style>
-      .key {
-        border: 1px solid black;
-        float: left;
-        padding: 10px;
-        margin: 10px;
-      }
-    </style>
+    <link rel="stylesheet" type="text/css" href="assets/css/piano.css" />
     <script src="assets/js/jquery-3.7.1.min.js"></script>
   </head>
   <body>
-    <div class="key do">ド</div>
-    <div class="key re">レ</div>
-    <div class="key mi">ミ</div>
-    <div class="key fa">ファ</div>
-    <div class="key so">ソ</div>
-    <div class="key ra">ラ</div>
-    <div class="key si">シ</div>
-    <div class="key show"></div>
+    <div class="container">
+      <div class="keyboard"></div>
+    </div>
+
     <script>
-      const audio = new AudioContext();
-      class Keyboard {
-        constructor(node, element) {
-          this.keys = {};
+      const audioContext = new AudioContext();
+
+      class Instrument {
+        /**
+         * @param {number} num - 鍵盤の数
+         * @param {AudioContext} audio -
+         * @param {JQuery} key_jquery - 挿入するHTMLの場所
+         * @param {number} initial_octave - 最初のオクターブ
+         * @param {number} shift
+         */
+        constructor(num, audio, key_jquery, initial_octave = 0, shift = 0) {
+          this.shift = shift;
+          num = num + shift;
+
+          this.audio = audio;
+          this.key_jquery = key_jquery;
+
+          this.osc_list = [];
+
+          this.main_gain_node = this.audio.createGain();
+          this.main_gain_node.connect(this.audio.destination);
+          this.main_gain_node.gain.value = 1;
+
+          const r = 1.05946309436;
+          this.notes = [];
+          this.initial_octave = initial_octave;
+          this.max_octave = Math.ceil((num - 2) / 12) + initial_octave;
+          this.scale = [
+            "A",
+            "A#",
+            "B",
+            "C",
+            "C#",
+            "D",
+            "D#",
+            "E",
+            "F",
+            "F#",
+            "G",
+            "G#",
+          ];
+          this.notes[0] = {
+            freq: 27.5 * 2 ** this.initial_octave,
+            note: "A",
+            octave: this.initial_octave,
+          };
+          for (let i = 1; i < num; i++) {
+            this.notes[i] = {
+              freq: this.notes[i - 1]["freq"] * r,
+              note: this.scale[i % 12],
+              octave: Math.ceil((i - 2) / 12) + initial_octave,
+            };
+          }
+          this.create_key();
         }
-        add_key(node, element) {
-          this.keys[node] = element;
+
+        create_key() {
+          this.notes.splice(0, this.shift);
+          this.notes.forEach((value, index) => {
+            this.key_jquery.append(
+              $("<div></div>")
+                .data(value)
+                .addClass(value.note)
+                .addClass(`key`)
+                .on("mousedown", (event) => this.note_pressed(event))
+                .on("mouseup", (event) => this.note_released(event))
+                .on("mouseover", (event) => this.note_pressed(event))
+                .on("mouseleave", (event) => this.note_released(event))
+            );
+          });
         }
-        key_down(node) {}
-        key_up() {}
+
+        note_pressed(event) {
+          if (event.buttons & 1) {
+            const target = $(event.target);
+            const dataset = target.data();
+
+            if (!dataset["pressed"]) {
+              this.osc_list[dataset["index"]] = this.play_tone(dataset["freq"]);
+              target.data("pressed", true);
+            }
+          }
+        }
+
+        note_released(event) {
+          const target = $(event.target);
+          const dataset = target.data();
+
+          if (dataset["pressed"]) {
+            if (this.osc_list[dataset["index"]]) {
+              this.osc_list[dataset["index"]].stop();
+              this.osc_list[dataset["index"]] = null;
+              target.data("pressed", false);
+            }
+          }
+        }
+
+        play_tone(freq) {
+          const attackTime = 0;
+          const releaseTime = 3;
+          const osc = this.audio.createOscillator();
+          osc.type = "Sine";
+
+          const now = this.audio.currentTime;
+          const gainNode = this.audio.createGain();
+          gainNode.gain.setValueAtTime(0, now);
+          gainNode.gain.linearRampToValueAtTime(0.4, now);
+          gainNode.gain.linearRampToValueAtTime(0.5, now + 0.5);
+          gainNode.gain.linearRampToValueAtTime(0, now + 5);
+
+          osc.connect(gainNode).connect(this.main_gain_node);
+          osc.frequency.value = freq;
+          osc.start();
+
+          return osc;
+        }
       }
+
+      let k = new Instrument(13, audioContext, $(".keyboard"), 3, 3);
     </script>
   </body>
 </html>

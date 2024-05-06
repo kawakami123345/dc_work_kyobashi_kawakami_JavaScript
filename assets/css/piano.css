@@ -1,0 +1,57 @@
+.container {
+  overflow-x: scroll;
+  overflow-y: hidden;
+  height: 200px;
+  width: 660px;
+  white-space: nowrap;
+  margin: 10px;
+}
+
+.keyboard {
+  padding: 0;
+  margin: 0;
+  width: max-content;
+  & div {
+    box-sizing: border-box;
+    float: left;
+    position: relative;
+    margin: 0;
+    padding: 0;
+    cursor: grab;
+    font: 16px "Open Sans", "Lucida Grande", "Arial", sans-serif;
+    border: 1px solid black;
+    border-radius: 5px;
+    width: 30px;
+    height: 100px;
+    text-align: start;
+    box-shadow: 2px 2px darkgray;
+    user-select: none;
+    -moz-user-select: none;
+    -webkit-user-select: none;
+    -ms-user-select: none;
+  }
+  & div:not([class*="#"]) {
+    z-index: 0;
+    background-color: #fff;
+    height: 160px;
+  }
+  & div[class*="#"] {
+    margin: 0 0 0 -10px;
+    z-index: 1;
+    background-color: #000;
+    width: 20px;
+  }
+  & .D,
+  .E,
+  .G,
+  .A,
+  .B {
+    margin: 0 0 0 -10px;
+  }
+  & .key:first-child {
+    margin-left: 20px;
+  }
+  & .key:last-child {
+    margin-right: 10px;
+  }
+}
