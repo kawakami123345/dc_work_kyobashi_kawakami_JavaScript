@@ -119,12 +119,15 @@
           }
         }
 
-        stop_tone(osc) {
+        stop_tone(osc_and_gain) {
           const release_time = 0.1;
           const now = this.audio.currentTime;
-          osc.gainNode.gain.cancelAndHoldAtTime(now);
-          osc.gainNode.gain.linearRampToValueAtTime(0, now + release_time);
-          osc.osc.stop(now + release_time + 0.1);
+          osc_and_gain.gainNode.gain.cancelAndHoldAtTime(now);
+          osc_and_gain.gainNode.gain.linearRampToValueAtTime(
+            0,
+            now + release_time
+          );
+          osc_and_gain.osc.stop(now + release_time + 0.1);
         }
 
         play_tone(freq) {
@@ -153,6 +156,7 @@
         show_display(text = "") {
           this.display.text(text);
         }
+
         create_auto_play_button(jq) {
           this.auto_play_button = $("<input>")
             .addClass(`auto_play_button`)
