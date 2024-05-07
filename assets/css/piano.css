@@ -1,7 +1,7 @@
 .container {
   overflow-x: scroll;
   overflow-y: hidden;
-  height: 200px;
+  height: 300px;
   width: 660px;
   white-space: nowrap;
   margin: 10px;
@@ -12,6 +12,9 @@
   margin: 0;
   width: max-content;
   & div {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
     box-sizing: border-box;
     float: left;
     position: relative;
@@ -21,32 +24,36 @@
     font: 16px "Open Sans", "Lucida Grande", "Arial", sans-serif;
     border: 1px solid black;
     border-radius: 5px;
-    width: 30px;
-    height: 100px;
-    text-align: start;
     box-shadow: 2px 2px darkgray;
     user-select: none;
     -moz-user-select: none;
     -webkit-user-select: none;
     -ms-user-select: none;
+    & p {
+      pointer-events: none;
+      margin: 0;
+    }
   }
   & div:not([class*="#"]) {
+    width: 50px;
     z-index: 0;
     background-color: #fff;
-    height: 160px;
+    height: 220px;
   }
   & div[class*="#"] {
-    margin: 0 0 0 -10px;
+    color: white;
+    margin: 0 0 0 -18px;
     z-index: 1;
     background-color: #000;
-    width: 20px;
+    width: 36px;
+    height: 140px;
   }
-  & .D,
-  .E,
-  .G,
-  .A,
-  .B {
-    margin: 0 0 0 -10px;
+  & .レ,
+  .ミ,
+  .ソ,
+  .ラ,
+  .シ {
+    margin: 0 0 0 -18px;
   }
   & .key:first-child {
     margin-left: 20px;
