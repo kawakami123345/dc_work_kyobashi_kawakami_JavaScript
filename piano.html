@@ -180,16 +180,21 @@
                 note === value.note && octave === value.octave
             );
             if (note === undefined) {
-              this.insert_note(0, next_note_time, value.length);
+              this.insert_note(
+                { freq: 0, note: "", octave: "" },
+                next_note_time,
+                value.length
+              );
             } else {
-              this.insert_note(note["freq"], next_note_time, value.length);
+              this.insert_note(note, next_note_time, value.length);
             }
             next_note_time += value.length;
           });
         }
-        insert_note(freq, time, length) {
+        insert_note(note, time, length) {
           const attack_time = 0.03;
           const release_time = 0.1;
+          const freq = note["freq"];
           const osc = this.audio.createOscillator();
           osc.type = "sine";
           const gainNode = this.audio.createGain();
