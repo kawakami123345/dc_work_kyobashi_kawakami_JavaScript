@@ -98,7 +98,11 @@
             const dataset = target.data();
 
             if (!dataset["pressed"]) {
-              this.osc_list[dataset["index"]] = this.play_tone(dataset["freq"]);
+              this.osc_list[dataset["index"]] = this.play_tone(
+                dataset["freq"],
+                this.audio.currentTime,
+                5
+              );
               target.data("pressed", true);
               this.show_display(dataset["note"]);
             }
@@ -130,21 +134,24 @@
           osc_and_gain.osc.stop(now + release_time + 0.1);
         }
 
-        play_tone(freq) {
+        play_tone(freq, time, length) {
           const attack_time = 0.1;
           const release_time = 0.1;
           const osc = this.audio.createOscillator();
           osc.type = "sine";
 
-          const now = this.audio.currentTime;
           const gainNode = this.audio.createGain();
-          gainNode.gain.setValueAtTime(0, now);
-          gainNode.gain.linearRampToValueAtTime(0.5, now + attack_time);
-          gainNode.gain.linearRampToValueAtTime(0, now + 4 - release_time);
+          gainNode.gain.setValueAtTime(0, time);
+          gainNode.gain.linearRampToValueAtTime(0.5, time + attack_time);
+          gainNode.gain.linearRampToValueAtTime(
+            0,
+            time + length + release_time
+          );
 
           osc.connect(gainNode).connect(this.main_gain_node);
           osc.frequency.value = freq;
-          osc.start();
+          osc.start(time);
+          osc.stop(time + length + release_time);
           return { osc, gainNode };
         }
 
@@ -172,6 +179,7 @@
 
         /** @param {Score} score */
         auto_play(score) {
+          const schedule_ahead_time = 0.1;
           const now = this.audio.currentTime;
           let next_note_time = now;
           score.score.forEach((value) => {
@@ -180,34 +188,16 @@
                 note === value.note && octave === value.octave
             );
             if (note === undefined) {
-              this.insert_note(
-                { freq: 0, note: "", octave: "" },
-                next_note_time,
-                value.length
-              );
+              this.play_tone(0, next_note_time, value.length);
             } else {
-              this.insert_note(note, next_note_time, value.length);
+              this.play_tone(note["freq"], next_note_time, value.length);
             }
             next_note_time += value.length;
+            while (
+              next_note_time <
+              this.audio.currentTime + schedule_ahead_time
+            ) {}
           });
-        }
-        insert_note(note, time, length) {
-          const attack_time = 0.03;
-          const release_time = 0.1;
-          const freq = note["freq"];
-          const osc = this.audio.createOscillator();
-          osc.type = "sine";
-          const gainNode = this.audio.createGain();
-          gainNode.gain.setValueAtTime(0, time);
-          gainNode.gain.linearRampToValueAtTime(0.5, time + attack_time);
-          gainNode.gain.linearRampToValueAtTime(
-            0,
-            time + length + release_time
-          );
-          osc.connect(gainNode).connect(this.main_gain_node);
-          osc.frequency.value = freq;
-          osc.start(time);
-          osc.stop(time + length + release_time);
         }
       }
     </script>
