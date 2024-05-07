@@ -198,7 +198,7 @@
           osc.connect(gainNode).connect(this.main_gain_node);
           osc.frequency.value = freq;
           osc.start(time);
-          osc.stop(time + length);
+          osc.stop(time + length + release_time);
         }
       }
     </script>
