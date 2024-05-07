@@ -111,7 +111,7 @@
 
           if (dataset["pressed"]) {
             if (this.osc_list[dataset["index"]]) {
-              this.osc_list[dataset["index"]].stop();
+              this.stop_tone(this.osc_list[dataset["index"]]);
               this.osc_list[dataset["index"]] = null;
               target.data("pressed", false);
               this.show_display();
@@ -119,21 +119,30 @@
           }
         }
 
+        stop_tone(osc) {
+          const release_time = 0.1;
+          const now = this.audio.currentTime;
+          osc.gainNode.gain.cancelAndHoldAtTime(now);
+          osc.gainNode.gain.linearRampToValueAtTime(0, now + release_time);
+          osc.osc.stop(now + release_time + 0.1);
+        }
+
         play_tone(freq) {
-          const attackTime = 0;
-          const releaseTime = 3;
+          const attack_time = 0.1;
+          const release_time = 0.1;
           const osc = this.audio.createOscillator();
           osc.type = "sine";
 
           const now = this.audio.currentTime;
           const gainNode = this.audio.createGain();
-          gainNode.gain.setValueAtTime(0.5, now);
-          gainNode.gain.linearRampToValueAtTime(0, now + 5);
+          gainNode.gain.setValueAtTime(0, now);
+          gainNode.gain.linearRampToValueAtTime(0.5, now + attack_time);
+          gainNode.gain.linearRampToValueAtTime(0, now + 4 - release_time);
 
           osc.connect(gainNode).connect(this.main_gain_node);
           osc.frequency.value = freq;
           osc.start();
-          return osc;
+          return { osc, gainNode };
         }
 
         /** @param {JQuery} jq */
@@ -149,28 +158,67 @@
             .addClass(`auto_play_button`)
             .prop("type", "button")
             .prop("value", "自動演奏")
-            .on("click", () => this.press_auto_play_button());
+            .on("click", () => this.press_auto_play_button(score));
           jq.after(this.auto_play_button);
         }
 
-        press_auto_play_button() {}
+        press_auto_play_button(score) {
+          this.auto_play(score);
+        }
+
         /** @param {Score} score */
         auto_play(score) {
-          const notesInQueue = [];
+          const now = this.audio.currentTime;
+          let next_note_time = now;
           score.score.forEach((value) => {
             let note = this.notes.find(
               ({ note, octave }) =>
                 note === value.note && octave === value.octave
             );
-            notesInQueue.push({ note: beatNumber, time });
+            if (note === undefined) {
+              this.insert_note(0, next_note_time, value.length);
+            } else {
+              this.insert_note(note["freq"], next_note_time, value.length);
+            }
+            next_note_time += value.length;
           });
+        }
+        insert_note(freq, time, length) {
+          const attack_time = 0.03;
+          const release_time = 0.1;
+          const osc = this.audio.createOscillator();
+          osc.type = "sine";
+          const gainNode = this.audio.createGain();
+          gainNode.gain.setValueAtTime(0, time);
+          gainNode.gain.linearRampToValueAtTime(0.5, time + attack_time);
+          gainNode.gain.linearRampToValueAtTime(
+            0,
+            time + length + release_time
+          );
+          osc.connect(gainNode).connect(this.main_gain_node);
+          osc.frequency.value = freq;
+          osc.start(time);
+          osc.stop(time + length);
         }
       }
     </script>
     <script>
       const audioContext = new AudioContext();
       let score = new Score();
-      score.add("ラ", 4, 500).add("シ", 4, 500);
+      score
+        .add("ド", 4, 0.5)
+        .add("レ", 4, 0.5)
+        .add("ミ", 4, 1)
+        .add("ド", 4, 0.5)
+        .add("レ", 4, 0.5)
+        .add("ミ", 4, 1)
+        .add("ソ", 4, 0.5)
+        .add("ミ", 4, 0.5)
+        .add("レ", 4, 0.5)
+        .add("ド", 4, 0.5)
+        .add("レ", 4, 0.5)
+        .add("ミ", 4, 0.5)
+        .add("レ", 4, 1);
       let piano = new Instrument(25, audioContext, $(".keyboard"), 3, 3);
       piano.create_display($(".container"));
       piano.create_auto_play_button($(".container"));
