@@ -163,14 +163,18 @@
         show_display(text = "") {
           this.display.text(text);
         }
-
+        /** @param {JQuery} jq */
         create_auto_play_button(jq) {
           this.auto_play_button = $("<input>")
             .addClass(`auto_play_button`)
             .prop("type", "button")
             .prop("value", "自動演奏")
             .on("click", () => this.press_auto_play_button(score));
-          jq.after(this.auto_play_button);
+          this.auto_play_text = $("<p>aaa</p>")
+            .addClass(`auto_play_text`)
+            .css("display", "inline-block");
+          jq.before(this.auto_play_button);
+          this.auto_play_button.after(this.auto_play_text);
         }
 
         press_auto_play_button(score) {
@@ -183,7 +187,10 @@
           const now = this.audio.currentTime;
           let next_note_time = now;
           const play_next_node = (index) => {
-            if (index >= score.score.length) return;
+            if (index >= score.score.length) {
+              this.show_display();
+              return;
+            }
             let value = score.score[index];
             let note = this.notes.find(
               ({ note, octave }) =>
@@ -191,11 +198,11 @@
             );
             if (note === undefined) {
               this.play_tone(0, next_note_time, value.length);
+              this.show_display();
             } else {
               this.play_tone(note["freq"], next_note_time, value.length);
+              this.show_display(note["note"]);
             }
-            this.show_display(note["note"]);
-            console.log(note["note"]);
             next_note_time += value.length;
 
             const wait_time =
@@ -215,7 +222,7 @@
         .add("ド", 4, 0.5)
         .add("レ", 4, 0.5)
         .add("ミ", 4, 1)
-        .add("ド", 4, 0.5)
+        .add("", 4, 0.5)
         .add("レ", 4, 0.5)
         .add("ミ", 4, 1)
         .add("ソ", 4, 0.5)
