@@ -191,22 +191,21 @@
             .addClass(`auto_play_button`)
             .prop("type", "button")
             .prop("value", "自動演奏")
-            .on("click", () => this.press_auto_play_button(this.scorelist));
+            .on("click", () => this.press_auto_play_button());
           this.auto_play_text = $("<p></p>").addClass(`auto_play_text`);
           jq.before(this.auto_play_button);
           this.auto_play_button.after(this.auto_play_text);
         }
 
-        press_auto_play_button(scorelist) {
-          let score = scorelist.get_random_score().score;
-          console.log(score);
+        press_auto_play_button() {
+          let score = this.scorelist.get_random_score();
           this.auto_play_button
             .prop("value", "演奏中止")
             .off()
-            .on("click", () => this.stop_auto_play(score));
-          this.auto_play_text.text("自動演奏中です：曲名");
+            .on("click", () => this.stop_auto_play());
+          this.auto_play_text.text(`自動演奏中です：${score.name}`);
           this.disable_keys();
-          this.auto_play(score);
+          this.auto_play(score.score);
         }
 
         /** @param {Score} score */
@@ -249,7 +248,7 @@
           this.auto_play_button
             .prop("value", "自動演奏")
             .off()
-            .on("click", () => this.press_auto_play_button(this.scorelist));
+            .on("click", () => this.press_auto_play_button());
           this.auto_play_text.text("");
           this.show_display();
           this.enable_keys();
@@ -275,9 +274,9 @@
     </script>
     <script>
       const audioContext = new AudioContext();
-      let score = new Score();
       let scorelist = new ScoreList();
-      score.add_from_portal_text(
+      let twinkle_twinkle_little_star = new Score();
+      twinkle_twinkle_little_star.add_from_portal_text(
         `ド(0.5秒)休符(0.5秒)ド(0.5秒)休符(0.5秒)ソ(0.5秒)休符(0.5秒)ソ(0.5秒)休符(0.5秒)
 ラ(0.5秒)休符(0.5秒)ラ(0.5秒)休符(0.5秒)ソ(2秒)
 ファ(0.5秒)休符(0.5秒)ファ(0.5秒)休符(0.5秒)ミ(0.5秒)休符(0.5秒)ミ(0.5秒)休符(0.5秒)
@@ -293,8 +292,9 @@
 ファ(0.5秒)休符(0.5秒)ファ(0.5秒)休符(0.5秒)ミ(0.5秒)休符(0.5秒)ミ(0.5秒)休符(0.5秒)
 レ(0.5秒)休符(0.5秒)レ(0.5秒)休符(0.5秒)ド(4秒)`
       );
-      scorelist.add_score("きらきら星", score);
-      score.add_from_portal_text(
+      scorelist.add_score("きらきら星", twinkle_twinkle_little_star);
+      let tulip = new Score();
+      tulip.add_from_portal_text(
         `ド(0.5秒)レ(0.5秒)ミ(1秒)ド(0.5秒)レ(0.5秒)ミ(1秒)
 ソ(0.5秒)ミ(0.5秒)レ(0.5秒)ド(0.5秒)レ(0.5秒)ミ(0.5秒)レ(1秒)
 ド(0.5秒)レ(0.5秒)ミ(1秒)ド(0.5秒)レ(0.5秒)ミ(1秒)ソ(0.5秒)ミ(0.5秒)レ(0.5秒)ド(0.5秒)レ(0.5秒)ミ(0.5秒)ド(1秒)
@@ -302,7 +302,7 @@
 ラ(0.25秒)休符(0.25秒)ラ(0.25秒)休符(0.25秒)ソ(1秒)
 ミ(0.25秒)休符(0.25秒)ミ(0.25秒)休符(0.25秒)レ(0.25秒)休符(0.25秒)レ(0.25秒)休符(0.25秒)ド(4秒)`
       );
-      scorelist.add_score("チューリップ", score);
+      scorelist.add_score("チューリップ", tulip);
       let piano = new Instrument(80, audioContext, $(".keyboard"), 0, 3);
       piano.create_display($(".container"));
       piano.create_auto_play_button($(".container"));
