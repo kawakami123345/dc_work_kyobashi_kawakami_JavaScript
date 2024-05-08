@@ -182,7 +182,9 @@
           const schedule_ahead_time = 0.1;
           const now = this.audio.currentTime;
           let next_note_time = now;
-          score.score.forEach((value) => {
+          const play_next_node = (index) => {
+            if (index >= score.score.length) return;
+            let value = score.score[index];
             let note = this.notes.find(
               ({ note, octave }) =>
                 note === value.note && octave === value.octave
@@ -192,12 +194,17 @@
             } else {
               this.play_tone(note["freq"], next_note_time, value.length);
             }
+            this.show_display(note["note"]);
+            console.log(note["note"]);
             next_note_time += value.length;
-            while (
-              next_note_time <
-              this.audio.currentTime + schedule_ahead_time
-            ) {}
-          });
+
+            const wait_time =
+              next_note_time - this.audio.currentTime - schedule_ahead_time;
+            setTimeout(() => {
+              play_next_node(index + 1);
+            }, wait_time * 1000);
+          };
+          play_next_node(0);
         }
       }
     </script>
