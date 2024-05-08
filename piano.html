@@ -2,14 +2,15 @@
 <html lang="ja">
   <head>
     <meta charset="UTF-8" />
+    <head>
+      <meta name="viewport" content="width=device-width,initial-scale=1" />
+    </head>
     <title>PIANO</title>
     <link rel="stylesheet" type="text/css" href="assets/css/piano.css" />
     <script src="assets/js/jquery-3.7.1.min.js"></script>
   </head>
   <body>
-    <div class="container">
-      <div class="keyboard"></div>
-    </div>
+    <div class="instrument1"></div>
 
     <script>
       class Score {
@@ -19,6 +20,9 @@
         add(note, octave, length) {
           this.score.push({ note: note, octave: octave, length: length });
           return this;
+        }
+        add_from_list(list) {
+          list.forEach((value) => this.add(value[0], value[1], value[2]));
         }
         /** @param {string} str */
         add_from_portal_text(str) {
@@ -50,18 +54,21 @@
         /**
          * @param {number} num - 鍵盤の数
          * @param {AudioContext} audio - AudioContext
-         * @param {JQuery} key_jquery - 挿入するHTMLの場所
+         * @param {JQuery} main_jquery - 挿入するHTMLの場所
          * @param {number} initial_octave - 最初のオクターブ
          * @param {number} shift - 鍵盤の開始位置の移動
          */
-        constructor(num, audio, key_jquery, initial_octave = 0, shift = 0) {
-          this.shift = shift;
+        constructor(num, main_jquery, initial_octave = 0, shift = 0) {
           num = num + shift;
-
-          this.audio = audio;
-          this.key_jquery = key_jquery;
-
+          this.audio = new AudioContext();
+          this.main_jquery = main_jquery;
           this.osc_list = [];
+          if (typeof Instrument.instance_count === "undefined") {
+            Instrument.instance_count = 1;
+          } else {
+            Instrument.instance_count++;
+          }
+          this.no = Instrument.instance_count;
 
           this.main_gain_node = this.audio.createGain();
           this.main_gain_node.connect(this.audio.destination);
@@ -69,9 +76,7 @@
 
           const r = Math.pow(2, 1 / 12);
           this.notes = [];
-          this.initial_octave = initial_octave;
-          this.max_octave = Math.ceil((num - 2) / 12) + initial_octave;
-          this.scale = [
+          let scale = [
             "ラ",
             "ラ#",
             "シ",
@@ -86,24 +91,33 @@
             "ソ#",
           ];
           this.notes[0] = {
-            freq: 27.5 * 2 ** this.initial_octave,
+            freq: 27.5 * 2 ** initial_octave,
             note: "ラ",
-            octave: this.initial_octave,
+            octave: initial_octave,
           };
           for (let i = 1; i < num; i++) {
             this.notes[i] = {
               freq: this.notes[i - 1]["freq"] * r,
-              note: this.scale[i % 12],
+              note: scale[i % 12],
               octave: Math.ceil((i - 2) / 12) + initial_octave,
             };
           }
+          this.notes.splice(0, shift);
+
           this.create_key();
+          this.create_display(this.container);
+          this.create_auto_play_button(this.container);
+          this.create_option_button(this.container);
         }
 
         create_key() {
-          this.notes.splice(0, this.shift);
+          this.keyboard_jq = $("<div></div>").addClass("keyboard");
+          this.container = $("<div></div>")
+            .addClass("container")
+            .append(this.keyboard_jq);
+          this.main_jquery.append(this.container);
           this.notes.forEach((value, index) => {
-            this.key_jquery.append(
+            this.keyboard_jq.append(
               $("<div></div>")
                 .data(value)
                 .addClass(value.note)
@@ -111,6 +125,12 @@
                 .append($("<p></p>").text(value.note))
             );
           });
+          this.white_color = this.keyboard_jq
+            .children("div:not([class*='#'])")
+            .css("background-color");
+          this.black_color = this.keyboard_jq
+            .children("div[class*='#']")
+            .css("background-color");
           this.enable_keys();
         }
 
@@ -145,15 +165,12 @@
           }
         }
 
-        stop_tone(osc_and_gain) {
+        stop_tone(osc) {
           const release_time = 0.1;
           const now = this.audio.currentTime;
-          osc_and_gain.gainNode.gain.cancelAndHoldAtTime(now);
-          osc_and_gain.gainNode.gain.linearRampToValueAtTime(
-            0,
-            now + release_time
-          );
-          osc_and_gain.osc.stop(now + release_time + 0.1);
+          osc.gainNode.gain.cancelAndHoldAtTime(now);
+          osc.gainNode.gain.linearRampToValueAtTime(0, now + release_time);
+          osc.osc.stop(now + release_time + 0.1);
         }
 
         play_tone(freq, time, length) {
@@ -195,6 +212,7 @@
           this.auto_play_text = $("<p></p>").addClass(`auto_play_text`);
           jq.before(this.auto_play_button);
           this.auto_play_button.after(this.auto_play_text);
+          this.scorelist = new ScoreList();
         }
 
         press_auto_play_button() {
@@ -207,22 +225,31 @@
           this.disable_keys();
           this.auto_play(score.score);
         }
-
+        reset_color() {
+          this.keyboard_jq
+            .children("div:not([class*='#'])")
+            .css("background-color", this.white_color);
+          this.keyboard_jq
+            .children("div[class*='#']")
+            .css("background-color", this.black_color);
+        }
         /** @param {Score} score */
         auto_play(score) {
           const schedule_ahead_time = 0.1;
           const now = this.audio.currentTime;
           let next_note_time = now;
           const play_next_node = (index) => {
+            this.reset_color();
             if (index >= score.score.length) {
               this.stop_auto_play();
               return;
             }
             let value = score.score[index];
-            let note = this.notes.find(
+            let i = this.notes.findIndex(
               ({ note, octave }) =>
                 note === value.note && octave === value.octave
             );
+            let note = this.notes[i];
             if (note === undefined) {
               this.last_note = this.play_tone(0, next_note_time, value.length);
               this.show_display();
@@ -233,6 +260,10 @@
                 value.length
               );
               this.show_display(note["note"]);
+              this.keyboard_jq
+                .children("div")
+                .eq(i)
+                .css("background-color", "#7dc97d");
             }
             next_note_time += value.length;
 
@@ -251,13 +282,14 @@
             .on("click", () => this.press_auto_play_button());
           this.auto_play_text.text("");
           this.show_display();
+          this.reset_color();
           this.enable_keys();
           this.stop_tone(this.last_note);
           clearTimeout(this.timeout_id);
         }
 
         enable_keys() {
-          this.key_jquery
+          this.keyboard_jq
             .children(".key")
             .on("mousedown", (event) => this.note_pressed(event))
             .on("mouseup", (event) => this.note_released(event))
@@ -265,16 +297,36 @@
             .on("mouseleave", (event) => this.note_released(event));
         }
         disable_keys() {
-          this.key_jquery.children(".key").off();
+          this.keyboard_jq.children(".key").off();
         }
-        add_score_list(scorelist) {
-          this.scorelist = scorelist;
+        add_score(name, score) {
+          this.scorelist.add_score(name, score);
+        }
+        /** @param {JQuery} jq */
+        create_option_button(jq) {
+          const volume_label = $("<label>音量</label>").prop(
+            "for",
+            `volume-${this.no}`
+          );
+          const volume = $("<input>")
+            .prop({
+              name: "volume",
+              id: `volume-${this.no}`,
+              type: "range",
+              min: "0",
+              max: "1",
+              step: "0.01",
+            })
+            .val(0.5)
+            .on("input", (ev) => {
+              this.main_gain_node.gain.value = ev.target.value;
+            });
+          jq.after(volume_label, volume);
         }
       }
     </script>
+
     <script>
-      const audioContext = new AudioContext();
-      let scorelist = new ScoreList();
       let twinkle_twinkle_little_star = new Score();
       twinkle_twinkle_little_star.add_from_portal_text(
         `ド(0.5秒)休符(0.5秒)ド(0.5秒)休符(0.5秒)ソ(0.5秒)休符(0.5秒)ソ(0.5秒)休符(0.5秒)
@@ -292,7 +344,6 @@
 ファ(0.5秒)休符(0.5秒)ファ(0.5秒)休符(0.5秒)ミ(0.5秒)休符(0.5秒)ミ(0.5秒)休符(0.5秒)
 レ(0.5秒)休符(0.5秒)レ(0.5秒)休符(0.5秒)ド(4秒)`
       );
-      scorelist.add_score("きらきら星", twinkle_twinkle_little_star);
       let tulip = new Score();
       tulip.add_from_portal_text(
         `ド(0.5秒)レ(0.5秒)ミ(1秒)ド(0.5秒)レ(0.5秒)ミ(1秒)
@@ -302,11 +353,11 @@
 ラ(0.25秒)休符(0.25秒)ラ(0.25秒)休符(0.25秒)ソ(1秒)
 ミ(0.25秒)休符(0.25秒)ミ(0.25秒)休符(0.25秒)レ(0.25秒)休符(0.25秒)レ(0.25秒)休符(0.25秒)ド(4秒)`
       );
-      scorelist.add_score("チューリップ", tulip);
-      let piano = new Instrument(80, audioContext, $(".keyboard"), 0, 3);
-      piano.create_display($(".container"));
-      piano.create_auto_play_button($(".container"));
-      piano.add_score_list(scorelist);
+
+      let piano = new Instrument(20, $(".instrument1"), 3, 3);
+
+      piano.add_score("きらきら星", twinkle_twinkle_little_star);
+      piano.add_score("チューリップ", tulip);
     </script>
   </body>
 </html>
