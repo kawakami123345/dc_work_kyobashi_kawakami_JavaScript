@@ -62,3 +62,8 @@
     margin-right: 10px;
   }
 }
+.auto_play_text {
+  display: inline-block;
+  height: 1em;
+  margin: 0;
+}

@@ -20,6 +20,31 @@
           this.score.push({ note: note, octave: octave, length: length });
           return this;
         }
+        /** @param {string} str */
+        add_from_portal_text(str) {
+          str = str.replace(/\s+/g, "");
+          const get_next_node = (str) => {
+            if (str === "") return;
+            let note = str.slice(0, str.indexOf("("));
+            str = str.slice(str.indexOf("(") + 1);
+            let length = str.slice(0, str.indexOf("秒"));
+            str = str.slice(str.indexOf("秒") + 2);
+            this.add(note, 4, Number(length));
+            get_next_node(str);
+          };
+          get_next_node(str);
+        }
+      }
+      class ScoreList {
+        constructor() {
+          this.scores = [];
+        }
+        add_score(name, score) {
+          this.scores.push({ name: name, score: score });
+        }
+        get_random_score() {
+          return this.scores[Math.floor(Math.random() * this.scores.length)];
+        }
       }
       class Instrument {
         /**
@@ -84,12 +109,9 @@
                 .addClass(value.note)
                 .addClass(`key`)
                 .append($("<p></p>").text(value.note))
-                .on("mousedown", (event) => this.note_pressed(event))
-                .on("mouseup", (event) => this.note_released(event))
-                .on("mouseover", (event) => this.note_pressed(event))
-                .on("mouseleave", (event) => this.note_released(event))
             );
           });
+          this.enable_keys();
         }
 
         note_pressed(event) {
@@ -169,15 +191,21 @@
             .addClass(`auto_play_button`)
             .prop("type", "button")
             .prop("value", "自動演奏")
-            .on("click", () => this.press_auto_play_button(score));
-          this.auto_play_text = $("<p>aaa</p>")
-            .addClass(`auto_play_text`)
-            .css("display", "inline-block");
+            .on("click", () => this.press_auto_play_button(this.scorelist));
+          this.auto_play_text = $("<p></p>").addClass(`auto_play_text`);
           jq.before(this.auto_play_button);
           this.auto_play_button.after(this.auto_play_text);
         }
 
-        press_auto_play_button(score) {
+        press_auto_play_button(scorelist) {
+          let score = scorelist.get_random_score().score;
+          console.log(score);
+          this.auto_play_button
+            .prop("value", "演奏中止")
+            .off()
+            .on("click", () => this.stop_auto_play(score));
+          this.auto_play_text.text("自動演奏中です：曲名");
+          this.disable_keys();
           this.auto_play(score);
         }
 
@@ -188,7 +216,7 @@
           let next_note_time = now;
           const play_next_node = (index) => {
             if (index >= score.score.length) {
-              this.show_display();
+              this.stop_auto_play();
               return;
             }
             let value = score.score[index];
@@ -197,44 +225,88 @@
                 note === value.note && octave === value.octave
             );
             if (note === undefined) {
-              this.play_tone(0, next_note_time, value.length);
+              this.last_note = this.play_tone(0, next_note_time, value.length);
               this.show_display();
             } else {
-              this.play_tone(note["freq"], next_note_time, value.length);
+              this.last_note = this.play_tone(
+                note["freq"],
+                next_note_time,
+                value.length
+              );
               this.show_display(note["note"]);
             }
             next_note_time += value.length;
 
             const wait_time =
               next_note_time - this.audio.currentTime - schedule_ahead_time;
-            setTimeout(() => {
+            this.timeout_id = setTimeout(() => {
               play_next_node(index + 1);
             }, wait_time * 1000);
           };
           play_next_node(0);
+        }
+        stop_auto_play() {
+          this.auto_play_button
+            .prop("value", "自動演奏")
+            .off()
+            .on("click", () => this.press_auto_play_button(this.scorelist));
+          this.auto_play_text.text("");
+          this.show_display();
+          this.enable_keys();
+          this.stop_tone(this.last_note);
+          clearTimeout(this.timeout_id);
+        }
+
+        enable_keys() {
+          this.key_jquery
+            .children(".key")
+            .on("mousedown", (event) => this.note_pressed(event))
+            .on("mouseup", (event) => this.note_released(event))
+            .on("mouseover", (event) => this.note_pressed(event))
+            .on("mouseleave", (event) => this.note_released(event));
+        }
+        disable_keys() {
+          this.key_jquery.children(".key").off();
+        }
+        add_score_list(scorelist) {
+          this.scorelist = scorelist;
         }
       }
     </script>
     <script>
       const audioContext = new AudioContext();
       let score = new Score();
-      score
-        .add("ド", 4, 0.5)
-        .add("レ", 4, 0.5)
-        .add("ミ", 4, 1)
-        .add("", 4, 0.5)
-        .add("レ", 4, 0.5)
-        .add("ミ", 4, 1)
-        .add("ソ", 4, 0.5)
-        .add("ミ", 4, 0.5)
-        .add("レ", 4, 0.5)
-        .add("ド", 4, 0.5)
-        .add("レ", 4, 0.5)
-        .add("ミ", 4, 0.5)
-        .add("レ", 4, 1);
+      let scorelist = new ScoreList();
+      score.add_from_portal_text(
+        `ド(0.5秒)休符(0.5秒)ド(0.5秒)休符(0.5秒)ソ(0.5秒)休符(0.5秒)ソ(0.5秒)休符(0.5秒)
+ラ(0.5秒)休符(0.5秒)ラ(0.5秒)休符(0.5秒)ソ(2秒)
+ファ(0.5秒)休符(0.5秒)ファ(0.5秒)休符(0.5秒)ミ(0.5秒)休符(0.5秒)ミ(0.5秒)休符(0.5秒)
+レ(0.5秒)休符(0.5秒)レ(0.5秒)休符(0.5秒)ド(2秒)
+
+ソ(0.5秒)休符(0.5秒)ソ(0.5秒)休符(0.5秒)ファ(0.5秒)休符(0.5秒)ファ(0.5秒)休符(0.5秒)
+ミ(0.5秒)休符(0.5秒)ミ(0.5秒)休符(0.5秒)レ(2秒)
+ソ(0.5秒)休符(0.5秒)ソ(0.5秒)休符(0.5秒)ファ(0.5秒)休符(0.5秒)ファ(0.5秒)休符(0.5秒)
+ミ(0.5秒)休符(0.5秒)ミ(0.5秒)休符(0.5秒)レ(2秒)
+
+ド(0.5秒)休符(0.5秒)ド(0.5秒)休符(0.5秒)ソ(0.5秒)休符(0.5秒)ソ(0.5秒)休符(0.5秒)
+ラ(0.5秒)休符(0.5秒)ラ(0.5秒)休符(0.5秒)ソ(2秒)
+ファ(0.5秒)休符(0.5秒)ファ(0.5秒)休符(0.5秒)ミ(0.5秒)休符(0.5秒)ミ(0.5秒)休符(0.5秒)
+レ(0.5秒)休符(0.5秒)レ(0.5秒)休符(0.5秒)ド(4秒)`
+      );
+      scorelist.add_score("きらきら星", score);
+      score.add_from_portal_text(
+        `ド(0.5秒)レ(0.5秒)ミ(1秒)ド(0.5秒)レ(0.5秒)ミ(1秒)
+ソ(0.5秒)ミ(0.5秒)レ(0.5秒)ド(0.5秒)レ(0.5秒)ミ(0.5秒)レ(1秒)
+ド(0.5秒)レ(0.5秒)ミ(1秒)ド(0.5秒)レ(0.5秒)ミ(1秒)ソ(0.5秒)ミ(0.5秒)レ(0.5秒)ド(0.5秒)レ(0.5秒)ミ(0.5秒)ド(1秒)
+ソ(0.25秒)休符(0.25秒)ソ(0.25秒)休符(0.25秒)ミ(0.25秒)休符(0.25秒)ソ(0.25秒)休符(0.25秒)
+ラ(0.25秒)休符(0.25秒)ラ(0.25秒)休符(0.25秒)ソ(1秒)
+ミ(0.25秒)休符(0.25秒)ミ(0.25秒)休符(0.25秒)レ(0.25秒)休符(0.25秒)レ(0.25秒)休符(0.25秒)ド(4秒)`
+      );
+      scorelist.add_score("チューリップ", score);
       let piano = new Instrument(80, audioContext, $(".keyboard"), 0, 3);
       piano.create_display($(".container"));
       piano.create_auto_play_button($(".container"));
+      piano.add_score_list(scorelist);
     </script>
   </body>
 </html>
