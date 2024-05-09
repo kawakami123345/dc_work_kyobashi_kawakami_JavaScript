@@ -72,7 +72,7 @@
 
           this.main_gain_node = this.audio.createGain();
           this.main_gain_node.connect(this.audio.destination);
-          this.main_gain_node.gain.value = 1;
+          this.main_gain_node.gain.value = 0.5;
 
           const r = Math.pow(2, 1 / 12);
           this.notes = [];
@@ -147,6 +147,7 @@
               );
               target.data("pressed", true);
               this.show_display(dataset["note"]);
+              clearTimeout(this.timeout_id);
             }
           }
         }
@@ -160,7 +161,7 @@
               this.stop_tone(this.osc_list[dataset["index"]]);
               this.osc_list[dataset["index"]] = null;
               target.data("pressed", false);
-              this.show_display();
+              this.timeout_id = setTimeout(() => this.show_display(), 1000);
             }
           }
         }
