@@ -2,9 +2,7 @@
 <html lang="ja">
   <head>
     <meta charset="UTF-8" />
-    <head>
-      <meta name="viewport" content="width=device-width,initial-scale=1" />
-    </head>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>PIANO</title>
     <link rel="stylesheet" type="text/css" href="assets/css/piano.css" />
     <script src="assets/js/jquery-3.7.1.min.js"></script>
@@ -49,6 +47,9 @@
         get_random_score() {
           return this.scores[Math.floor(Math.random() * this.scores.length)];
         }
+      }
+      class Screen {
+        constructor() {}
       }
       class Instrument {
         /**
