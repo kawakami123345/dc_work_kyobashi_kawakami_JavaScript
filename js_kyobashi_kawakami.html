@@ -49,8 +49,36 @@
         }
       }
       class Screen {
-        constructor() {}
+        constructor(main_jquery, notes) {
+          this.main_jquery = main_jquery;
+          this.notes = notes;
+        }
+        create_key() {
+          this.keyboard_jq = $("<div></div>").addClass("keyboard");
+          this.container = $("<div></div>")
+            .addClass("container")
+            .append(this.keyboard_jq);
+          this.main_jquery.append(this.container);
+          this.notes.forEach((value, index) => {
+            this.keyboard_jq.append(
+              $("<div></div>")
+                .data(value)
+                .addClass(value.note)
+                .addClass(`key`)
+                .append($("<p></p>").text(value.note))
+            );
+          });
+          this.white_color = this.keyboard_jq
+            .children("div:not([class*='#'])")
+            .css("background-color");
+          this.black_color = this.keyboard_jq
+            .children("div[class*='#']")
+            .css("background-color");
+          this.enable_keys();
+        }
       }
+      class Tone {}
+      class AutoPlay {}
       class Instrument {
         /**
          * @param {number} num - 鍵盤の数
