@@ -37,6 +37,7 @@
           get_next_node(str);
         }
       }
+
       class ScoreList {
         constructor() {
           this.scores = [];
@@ -48,10 +49,17 @@
           return this.scores[Math.floor(Math.random() * this.scores.length)];
         }
       }
+
       class Screen {
-        constructor(main_jquery, notes) {
+        constructor(main_jquery, notes, no) {
           this.main_jquery = main_jquery;
           this.notes = notes;
+          this.no = no;
+
+          this.create_key();
+          this.create_display(this.container);
+          this.create_auto_play_button(this.container);
+          this.create_option_button(this.container);
         }
         create_key() {
           this.keyboard_jq = $("<div></div>").addClass("keyboard");
@@ -74,11 +82,223 @@
           this.black_color = this.keyboard_jq
             .children("div[class*='#']")
             .css("background-color");
-          this.enable_keys();
+        }
+        create_display(jq) {
+          this.display = $("<div></div>").addClass(`display`);
+          jq.after(this.display);
+        }
+        show_display(text = "") {
+          this.display.text(text);
+        }
+        create_auto_play_button(jq) {
+          this.auto_play_button = $("<input>")
+            .addClass(`auto_play_button`)
+            .prop("type", "button")
+            .prop("value", "自動演奏");
+          this.auto_play_text = $("<p></p>").addClass(`auto_play_text`);
+          jq.before(this.auto_play_button);
+          this.auto_play_button.after(this.auto_play_text);
+        }
+        create_option_button(jq) {
+          const volume_label = $("<label>音量</label>").prop(
+            "for",
+            `volume-${this.no}`
+          );
+          this.volume = $("<input>")
+            .prop({
+              name: "volume",
+              id: `volume-${this.no}`,
+              type: "range",
+              min: "0",
+              max: "1",
+              step: "0.01",
+            })
+            .val(0.5);
+          jq.after(volume_label, this.volume);
+        }
+        reset_color() {
+          this.keyboard_jq
+            .children("div:not([class*='#'])")
+            .css("background-color", this.white_color);
+          this.keyboard_jq
+            .children("div[class*='#']")
+            .css("background-color", this.black_color);
         }
       }
-      class Tone {}
-      class AutoPlay {}
+
+      class KeyEvents {
+        constructor(tone, screen) {
+          this.tone = tone;
+          this.screen = screen;
+        }
+        enable_keys() {
+          this.screen.keyboard_jq
+            .children(".key")
+            .on("mousedown", (event) => this.note_pressed(event))
+            .on("mouseup", (event) => this.note_released(event))
+            .on("mouseover", (event) => this.note_pressed(event))
+            .on("mouseleave", (event) => this.note_released(event));
+        }
+        disable_keys() {
+          this.screen.keyboard_jq.children(".key").off();
+        }
+        note_pressed(event) {
+          if (event.buttons & 1) {
+            const target = $(event.target);
+            const dataset = target.data();
+
+            if (!dataset["pressed"]) {
+              this.tone.osc_list[dataset["index"]] = this.tone.play_tone(
+                dataset["freq"],
+                this.tone.audio.currentTime,
+                5
+              );
+              target.data("pressed", true);
+              this.screen.show_display(dataset["note"]);
+              clearTimeout(this.timeout_id);
+            }
+          }
+        }
+        note_released(event) {
+          const target = $(event.target);
+          const dataset = target.data();
+
+          if (dataset["pressed"]) {
+            if (this.tone.osc_list[dataset["index"]]) {
+              this.tone.stop_tone(this.tone.osc_list[dataset["index"]]);
+              this.tone.osc_list[dataset["index"]] = null;
+              target.data("pressed", false);
+              this.timeout_id = setTimeout(
+                () => this.screen.show_display(),
+                1000
+              );
+            }
+          }
+        }
+        enable_auto_play_button(auto_play) {
+          this.screen.auto_play_button.on("click", () =>
+            auto_play.press_auto_play_button()
+          );
+        }
+        enable_option_button() {
+          this.screen.volume.on("input", (ev) => {
+            this.tone.main_gain_node.gain.value = ev.target.value;
+          });
+        }
+      }
+      class Tone {
+        constructor(audio, main_gain_node) {
+          this.audio = audio;
+          this.main_gain_node = main_gain_node;
+          this.osc_list = [];
+        }
+        stop_tone(osc) {
+          const release_time = 0.1;
+          const now = this.audio.currentTime;
+          osc.gainNode.gain.cancelAndHoldAtTime(now);
+          osc.gainNode.gain.linearRampToValueAtTime(0, now + release_time);
+          osc.osc.stop(now + release_time + 0.1);
+        }
+        play_tone(freq, time, length) {
+          const attack_time = 0.1;
+          const release_time = 0.1;
+          const osc = this.audio.createOscillator();
+          osc.type = "sine";
+
+          const gainNode = this.audio.createGain();
+          gainNode.gain.setValueAtTime(0, time);
+          gainNode.gain.linearRampToValueAtTime(0.5, time + attack_time);
+          gainNode.gain.linearRampToValueAtTime(
+            0,
+            time + length + release_time
+          );
+
+          osc.connect(gainNode).connect(this.main_gain_node);
+          osc.frequency.value = freq;
+          osc.start(time);
+          osc.stop(time + length + release_time);
+          return { osc, gainNode };
+        }
+      }
+
+      class AutoPlay {
+        constructor(screen, key_events, tone, scorelist) {
+          this.screen = screen;
+          this.key_events = key_events;
+          this.tone = tone;
+          this.scorelist = scorelist;
+        }
+        /** @param {Score} score */
+        auto_play(score) {
+          const schedule_ahead_time = 0.1;
+          const now = this.tone.audio.currentTime;
+          let next_note_time = now;
+          const play_next_node = (index) => {
+            this.screen.reset_color();
+            if (index >= score.score.length) {
+              this.stop_auto_play();
+              return;
+            }
+            let value = score.score[index];
+            let i = this.screen.notes.findIndex(
+              ({ note, octave }) =>
+                note === value.note && octave === value.octave
+            );
+            let note = this.screen.notes[i];
+            if (note === undefined) {
+              this.last_note = this.tone.play_tone(
+                0,
+                next_note_time,
+                value.length
+              );
+              this.screen.show_display();
+            } else {
+              this.last_note = this.tone.play_tone(
+                note["freq"],
+                next_note_time,
+                value.length
+              );
+              this.screen.show_display(note["note"]);
+              this.screen.keyboard_jq
+                .children("div")
+                .eq(i)
+                .css("background-color", "#7dc97d");
+            }
+            next_note_time += value.length;
+
+            const wait_time =
+              next_note_time -
+              this.tone.audio.currentTime -
+              schedule_ahead_time;
+            this.timeout_id = setTimeout(() => {
+              play_next_node(index + 1);
+            }, wait_time * 1000);
+          };
+          play_next_node(0);
+        }
+        stop_auto_play() {
+          this.screen.auto_play_button
+            .prop("value", "自動演奏")
+            .off()
+            .on("click", () => this.press_auto_play_button());
+          this.screen.auto_play_text.text("");
+          this.screen.show_display();
+          this.screen.reset_color();
+          this.key_events.enable_keys();
+          this.tone.stop_tone(this.last_note);
+          clearTimeout(this.timeout_id);
+        }
+        press_auto_play_button() {
+          let score = this.scorelist.get_random_score();
+          this.screen.auto_play_button
+            .prop("value", "演奏中止")
+            .off()
+            .on("click", () => this.stop_auto_play());
+          this.screen.auto_play_text.text(`自動演奏中です：${score.name}`);
+          this.key_events.disable_keys();
+          this.auto_play(score.score);
+        }
+      }
       class Instrument {
         /**
          * @param {number} num - 鍵盤の数
@@ -89,8 +309,7 @@
         constructor(num, main_jquery, initial_octave = 0, shift = 0) {
           num = num + shift;
           this.audio = new AudioContext();
-          this.main_jquery = main_jquery;
-          this.osc_list = [];
+
           if (typeof Instrument.instance_count === "undefined") {
             Instrument.instance_count = 1;
           } else {
@@ -132,225 +351,21 @@
           }
           this.notes.splice(0, shift);
 
-          this.create_key();
-          this.create_display(this.container);
-          this.create_auto_play_button(this.container);
-          this.create_option_button(this.container);
-        }
+          this.tone = new Tone(this.audio, this.main_gain_node);
 
-        create_key() {
-          this.keyboard_jq = $("<div></div>").addClass("keyboard");
-          this.container = $("<div></div>")
-            .addClass("container")
-            .append(this.keyboard_jq);
-          this.main_jquery.append(this.container);
-          this.notes.forEach((value, index) => {
-            this.keyboard_jq.append(
-              $("<div></div>")
-                .data(value)
-                .addClass(value.note)
-                .addClass(`key`)
-                .append($("<p></p>").text(value.note))
-            );
-          });
-          this.white_color = this.keyboard_jq
-            .children("div:not([class*='#'])")
-            .css("background-color");
-          this.black_color = this.keyboard_jq
-            .children("div[class*='#']")
-            .css("background-color");
-          this.enable_keys();
-        }
-
-        note_pressed(event) {
-          if (event.buttons & 1) {
-            const target = $(event.target);
-            const dataset = target.data();
-
-            if (!dataset["pressed"]) {
-              this.osc_list[dataset["index"]] = this.play_tone(
-                dataset["freq"],
-                this.audio.currentTime,
-                5
-              );
-              target.data("pressed", true);
-              this.show_display(dataset["note"]);
-              clearTimeout(this.timeout_id);
-            }
-          }
-        }
-
-        note_released(event) {
-          const target = $(event.target);
-          const dataset = target.data();
-
-          if (dataset["pressed"]) {
-            if (this.osc_list[dataset["index"]]) {
-              this.stop_tone(this.osc_list[dataset["index"]]);
-              this.osc_list[dataset["index"]] = null;
-              target.data("pressed", false);
-              this.timeout_id = setTimeout(() => this.show_display(), 1000);
-            }
-          }
-        }
-
-        stop_tone(osc) {
-          const release_time = 0.1;
-          const now = this.audio.currentTime;
-          osc.gainNode.gain.cancelAndHoldAtTime(now);
-          osc.gainNode.gain.linearRampToValueAtTime(0, now + release_time);
-          osc.osc.stop(now + release_time + 0.1);
-        }
-
-        play_tone(freq, time, length) {
-          const attack_time = 0.1;
-          const release_time = 0.1;
-          const osc = this.audio.createOscillator();
-          osc.type = "sine";
-
-          const gainNode = this.audio.createGain();
-          gainNode.gain.setValueAtTime(0, time);
-          gainNode.gain.linearRampToValueAtTime(0.5, time + attack_time);
-          gainNode.gain.linearRampToValueAtTime(
-            0,
-            time + length + release_time
-          );
-
-          osc.connect(gainNode).connect(this.main_gain_node);
-          osc.frequency.value = freq;
-          osc.start(time);
-          osc.stop(time + length + release_time);
-          return { osc, gainNode };
-        }
-
-        /** @param {JQuery} jq */
-        create_display(jq) {
-          this.display = $("<div></div>").addClass(`display`);
-          jq.after(this.display);
-        }
-        show_display(text = "") {
-          this.display.text(text);
-        }
-        /** @param {JQuery} jq */
-        create_auto_play_button(jq) {
-          this.auto_play_button = $("<input>")
-            .addClass(`auto_play_button`)
-            .prop("type", "button")
-            .prop("value", "自動演奏")
-            .on("click", () => this.press_auto_play_button());
-          this.auto_play_text = $("<p></p>").addClass(`auto_play_text`);
-          jq.before(this.auto_play_button);
-          this.auto_play_button.after(this.auto_play_text);
+          this.screen = new Screen(main_jquery, this.notes, this.no);
+          this.keyEvents = new KeyEvents(this.tone, this.screen);
           this.scorelist = new ScoreList();
-        }
-
-        press_auto_play_button() {
-          let score = this.scorelist.get_random_score();
-          this.auto_play_button
-            .prop("value", "演奏中止")
-            .off()
-            .on("click", () => this.stop_auto_play());
-          this.auto_play_text.text(`自動演奏中です：${score.name}`);
-          this.disable_keys();
-          this.auto_play(score.score);
-        }
-        reset_color() {
-          this.keyboard_jq
-            .children("div:not([class*='#'])")
-            .css("background-color", this.white_color);
-          this.keyboard_jq
-            .children("div[class*='#']")
-            .css("background-color", this.black_color);
-        }
-        /** @param {Score} score */
-        auto_play(score) {
-          const schedule_ahead_time = 0.1;
-          const now = this.audio.currentTime;
-          let next_note_time = now;
-          const play_next_node = (index) => {
-            this.reset_color();
-            if (index >= score.score.length) {
-              this.stop_auto_play();
-              return;
-            }
-            let value = score.score[index];
-            let i = this.notes.findIndex(
-              ({ note, octave }) =>
-                note === value.note && octave === value.octave
-            );
-            let note = this.notes[i];
-            if (note === undefined) {
-              this.last_note = this.play_tone(0, next_note_time, value.length);
-              this.show_display();
-            } else {
-              this.last_note = this.play_tone(
-                note["freq"],
-                next_note_time,
-                value.length
-              );
-              this.show_display(note["note"]);
-              this.keyboard_jq
-                .children("div")
-                .eq(i)
-                .css("background-color", "#7dc97d");
-            }
-            next_note_time += value.length;
-
-            const wait_time =
-              next_note_time - this.audio.currentTime - schedule_ahead_time;
-            this.timeout_id = setTimeout(() => {
-              play_next_node(index + 1);
-            }, wait_time * 1000);
-          };
-          play_next_node(0);
-        }
-        stop_auto_play() {
-          this.auto_play_button
-            .prop("value", "自動演奏")
-            .off()
-            .on("click", () => this.press_auto_play_button());
-          this.auto_play_text.text("");
-          this.show_display();
-          this.reset_color();
-          this.enable_keys();
-          this.stop_tone(this.last_note);
-          clearTimeout(this.timeout_id);
-        }
-
-        enable_keys() {
-          this.keyboard_jq
-            .children(".key")
-            .on("mousedown", (event) => this.note_pressed(event))
-            .on("mouseup", (event) => this.note_released(event))
-            .on("mouseover", (event) => this.note_pressed(event))
-            .on("mouseleave", (event) => this.note_released(event));
-        }
-        disable_keys() {
-          this.keyboard_jq.children(".key").off();
-        }
-        add_score(name, score) {
-          this.scorelist.add_score(name, score);
-        }
-        /** @param {JQuery} jq */
-        create_option_button(jq) {
-          const volume_label = $("<label>音量</label>").prop(
-            "for",
-            `volume-${this.no}`
+          this.auto_play = new AutoPlay(
+            this.screen,
+            this.keyEvents,
+            this.tone,
+            this.scorelist
           );
-          const volume = $("<input>")
-            .prop({
-              name: "volume",
-              id: `volume-${this.no}`,
-              type: "range",
-              min: "0",
-              max: "1",
-              step: "0.01",
-            })
-            .val(0.5)
-            .on("input", (ev) => {
-              this.main_gain_node.gain.value = ev.target.value;
-            });
-          jq.after(volume_label, volume);
+
+          this.keyEvents.enable_keys();
+          this.keyEvents.enable_option_button();
+          this.keyEvents.enable_auto_play_button(this.auto_play);
         }
       }
     </script>
@@ -385,8 +400,8 @@
 
       let piano = new Instrument(20, $(".instrument1"), 3, 3);
 
-      piano.add_score("きらきら星", twinkle_twinkle_little_star);
-      piano.add_score("チューリップ", tulip);
+      piano.scorelist.add_score("きらきら星", twinkle_twinkle_little_star);
+      piano.scorelist.add_score("チューリップ", tulip);
     </script>
   </body>
 </html>
