@@ -187,9 +187,11 @@
         }
       }
       class Tone {
-        constructor(audio, main_gain_node) {
+        constructor(audio) {
           this.audio = audio;
-          this.main_gain_node = main_gain_node;
+          this.main_gain_node = this.audio.createGain();
+          this.main_gain_node.connect(this.audio.destination);
+          this.main_gain_node.gain.value = 0.5;
           this.osc_list = [];
         }
         stop_tone(osc) {
@@ -316,10 +318,6 @@
             Instrument.instance_count++;
           }
           this.no = Instrument.instance_count;
-
-          this.main_gain_node = this.audio.createGain();
-          this.main_gain_node.connect(this.audio.destination);
-          this.main_gain_node.gain.value = 0.5;
 
           const r = Math.pow(2, 1 / 12);
           this.notes = [];
